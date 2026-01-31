@@ -1,6 +1,7 @@
 package com.openclaw.assistant.service
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.service.voice.VoiceInteractionSession
 import android.util.Log
@@ -34,12 +35,18 @@ import com.openclaw.assistant.speech.SpeechResult
 import com.openclaw.assistant.speech.TTSManager
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 
 /**
  * Voice Interaction Session
  * 実際の音声対話を処理
  */
-class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
+class OpenClawSession(context: Context) : VoiceInteractionSession(context), 
+    androidx.lifecycle.LifecycleOwner,
+    androidx.savedstate.SavedStateRegistryOwner,
+    androidx.lifecycle.ViewModelStoreOwner {
 
     companion object {
         private const val TAG = "OpenClawSession"
@@ -64,24 +71,30 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
         ttsManager = TTSManager(context)
     }
 
-    override fun onShow(args: Bundle?, showFlags: Int) {
-        super.onShow(args, showFlags)
-        Log.d(TAG, "Session shown")
-        
-        // 設定チェック
-        if (!settings.isConfigured()) {
-            currentState.value = AssistantState.ERROR
-            errorMessage.value = "Please configure Webhook URL"
-            displayText.value = "Configuration required"
-            return
-        }
+    private val lifecycleRegistry = androidx.lifecycle.LifecycleRegistry(this)
+    private val savedStateRegistryController = androidx.savedstate.SavedStateRegistryController.create(this)
+    
+    // Audio Cue
+    private val toneGenerator = android.media.ToneGenerator(android.media.AudioManager.STREAM_MUSIC, 100)
 
-        // 音声認識開始
-        startListening()
-    }
+    override val lifecycle: androidx.lifecycle.Lifecycle
+        get() = lifecycleRegistry
+
+    override val savedStateRegistry: androidx.savedstate.SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
 
     override fun onCreateContentView(): View {
+        // Initialize lifecycle and saved state
+        savedStateRegistryController.performAttach()
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_CREATE)
+
         val composeView = ComposeView(context).apply {
+            // Set ViewTree owners using extensions
+            setViewTreeLifecycleOwner(this@OpenClawSession)
+            setViewTreeViewModelStoreOwner(this@OpenClawSession)
+            setViewTreeSavedStateRegistryOwner(this@OpenClawSession)
+            
             setContent {
                 AssistantUI(
                     state = currentState.value,
@@ -96,24 +109,107 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
         return composeView
     }
 
+    override fun onShow(args: Bundle?, showFlags: Int) {
+        super.onShow(args, showFlags)
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_START)
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_RESUME)
+        
+        Log.d(TAG, "Session shown")
+        
+        // PAUSE Hotword Service to prevent microphone conflict
+        sendPauseBroadcast()
+        
+        // ... rest of onShow ...
+        
+        // 設定チェック
+        if (!settings.isConfigured()) {
+            currentState.value = AssistantState.ERROR
+            errorMessage.value = "Please configure Webhook URL"
+            displayText.value = "Configuration required"
+            return
+        }
+
+        // 音声認識開始
+        startListening()
+    }
+    
+    override fun onHide() {
+        super.onHide()
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_PAUSE)
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_STOP)
+        
+        scope.cancel()
+        speechManager.destroy()
+        ttsManager.stop()
+
+        // Resume Hotword
+        sendResumeBroadcast()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        lifecycleRegistry.handleLifecycleEvent(androidx.lifecycle.Lifecycle.Event.ON_DESTROY)
+        
+        // Resume Hotword (safety)
+        sendResumeBroadcast()
+        
+        ttsManager.shutdown()
+        toneGenerator.release()
+    }
+
+    private fun sendPauseBroadcast() {
+        val intent = Intent("com.openclaw.assistant.ACTION_PAUSE_HOTWORD")
+        // Explicit package set for security if preferred, but implicit is fine for local broadcast
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+    }
+    
+    private fun sendResumeBroadcast() {
+        val intent = Intent("com.openclaw.assistant.ACTION_RESUME_HOTWORD")
+        intent.setPackage(context.packageName)
+        context.sendBroadcast(intent)
+    }
+
+    // Must implement ViewModelStoreOwner for Compose
+    override val viewModelStore: androidx.lifecycle.ViewModelStore = androidx.lifecycle.ViewModelStore()
+
+    private var listeningJob: Job? = null
+
     private fun startListening() {
-        currentState.value = AssistantState.LISTENING
-        displayText.value = "Listening..."
+        // Cancel previous listening job if any
+        listeningJob?.cancel()
+        
+        // Don't show "Listening..." yet. Show "Processing..." or keep previous state 
+        // until the recognizer is actually ready.
+        currentState.value = AssistantState.PROCESSING
+        displayText.value = "" // Clear text
         partialText.value = ""
         errorMessage.value = null
 
-        scope.launch {
+        listeningJob = scope.launch {
+            // Request audio focus
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+            audioManager.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+
+            // Ensure previous resources are cleaned up
+            delay(200)
+            
             speechManager.startListening("ja-JP").collectLatest { result ->
                 when (result) {
                     is SpeechResult.Ready -> {
                         Log.d(TAG, "Speech ready")
+                        // NOW we are ready to listen
+                        currentState.value = AssistantState.LISTENING
+                        displayText.value = "Listening..."
+                        toneGenerator.startTone(android.media.ToneGenerator.TONE_PROP_BEEP)
                     }
                     is SpeechResult.Listening -> {
-                        currentState.value = AssistantState.LISTENING
+                        if (currentState.value != AssistantState.LISTENING) {
+                            currentState.value = AssistantState.LISTENING
+                            displayText.value = "Listening..."
+                        }
                     }
-                    is SpeechResult.RmsChanged -> {
-                        // 音量レベル（アニメーション用）
-                    }
+                    is SpeechResult.RmsChanged -> {}
                     is SpeechResult.PartialResult -> {
                         partialText.value = result.text
                     }
@@ -128,8 +224,14 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
                     }
                     is SpeechResult.Error -> {
                         Log.e(TAG, "Speech error: ${result.message}")
-                        currentState.value = AssistantState.ERROR
-                        errorMessage.value = result.message
+                        
+                        if (result.message.contains("ビジー")) {
+                             delay(500)
+                             startListening() // Auto-retry
+                        } else {
+                            currentState.value = AssistantState.ERROR
+                            errorMessage.value = result.message
+                        }
                     }
                 }
             }
@@ -138,7 +240,7 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
 
     private fun sendToOpenClaw(message: String) {
         currentState.value = AssistantState.THINKING
-        displayText.value = "Thinking..."
+        displayText.value = "" // Clear text to avoid duplication with status "Thinking..."
 
         scope.launch {
             val result = apiClient.sendMessage(
@@ -178,7 +280,7 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
             val success = ttsManager.speak(text)
             if (success) {
                 // 読み上げ完了後、連続会話のため再度リスニング開始
-                delay(500)
+                delay(1000)
                 startListening()
             } else {
                 currentState.value = AssistantState.ERROR
@@ -187,17 +289,7 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context) {
         }
     }
 
-    override fun onHide() {
-        super.onHide()
-        scope.cancel()
-        speechManager.destroy()
-        ttsManager.stop()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        ttsManager.shutdown()
-    }
+    // Removed duplicates as they are now handled in the main block above
 }
 
 /**

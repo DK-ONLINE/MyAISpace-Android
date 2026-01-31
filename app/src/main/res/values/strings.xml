@@ -12,6 +12,7 @@
     <string name="session_id_label">Session ID</string>
     <string name="user_id_label">User ID</string>
     <string name="save_button">Save</string>
+    <string name="test_connection_button">Test Connection</string>
     <string name="hotword_enabled_label">Enable Hotword Detection</string>
     <string name="picovoice_key_label">Picovoice Access Key</string>
     <string name="picovoice_key_hint">Get from free account</string>

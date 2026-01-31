@@ -26,7 +26,12 @@ class SettingsRepository(context: Context) {
     // Webhook URL (required)
     var webhookUrl: String
         get() = prefs.getString(KEY_WEBHOOK_URL, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_WEBHOOK_URL, value).apply()
+        set(value) {
+            if (value != webhookUrl) {
+                prefs.edit().putString(KEY_WEBHOOK_URL, value).apply()
+                isVerified = false
+            }
+        }
 
     // Auth Token (optional)
     var authToken: String
@@ -41,18 +46,21 @@ class SettingsRepository(context: Context) {
         }
         set(value) = prefs.edit().putString(KEY_SESSION_ID, value).apply()
 
-    // Picovoice Access Key (hardcoded)
-    val picovoiceAccessKey: String
-        get() = PICOVOICE_ACCESS_KEY
+
 
     // Hotword enabled
     var hotwordEnabled: Boolean
         get() = prefs.getBoolean(KEY_HOTWORD_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_HOTWORD_ENABLED, value).apply()
 
+    // Connection Verified
+    var isVerified: Boolean
+        get() = prefs.getBoolean(KEY_IS_VERIFIED, false)
+        set(value) = prefs.edit().putBoolean(KEY_IS_VERIFIED, value).apply()
+
     // Check if configured
     fun isConfigured(): Boolean {
-        return webhookUrl.isNotBlank()
+        return webhookUrl.isNotBlank() && isVerified
     }
 
     // Generate new session ID
@@ -71,9 +79,9 @@ class SettingsRepository(context: Context) {
         private const val KEY_AUTH_TOKEN = "auth_token"
         private const val KEY_SESSION_ID = "session_id"
         private const val KEY_HOTWORD_ENABLED = "hotword_enabled"
+        private const val KEY_IS_VERIFIED = "is_verified"
 
-        // Hardcoded Picovoice Access Key
-        private const val PICOVOICE_ACCESS_KEY = "NvmV8rffJPNXTVlKl1kctpOBQv1pHIycrLkEG1u8aMvNFGp/i7MWHQ=="
+
 
         @Volatile
         private var instance: SettingsRepository? = null

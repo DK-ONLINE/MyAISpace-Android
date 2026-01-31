@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -60,11 +61,13 @@ fun SettingsScreen(
     var authToken by remember { mutableStateOf(settings.authToken) }
     
     var showAuthToken by remember { mutableStateOf(false) }
-    var isTesting by remember { mutableStateOf(false) }
-    var testResult by remember { mutableStateOf<TestResult?>(null) }
     
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val apiClient = remember { OpenClawClient() }
+    
+    var isTesting by remember { mutableStateOf(false) }
+    var testResult by remember { mutableStateOf<TestResult?>(null) }
 
     Scaffold(
         topBar = {
@@ -82,7 +85,7 @@ fun SettingsScreen(
                             settings.authToken = authToken
                             onSave()
                         },
-                        enabled = webhookUrl.isNotBlank()
+                        enabled = webhookUrl.isNotBlank() && !isTesting
                     ) {
                         Text("Save")
                     }
@@ -145,54 +148,66 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // Test Connection Button
+            // Test Connection Button (v2 layout with improved feedback)
             Button(
                 onClick = {
                     if (webhookUrl.isBlank()) return@Button
-                    isTesting = true
-                    testResult = null
                     scope.launch {
-                        val result = apiClient.sendMessage(
-                            webhookUrl = webhookUrl,
-                            message = "ping",
-                            sessionId = "test-${System.currentTimeMillis()}",
-                            authToken = authToken.takeIf { it.isNotBlank() }
-                        )
-                        testResult = result.fold(
-                            onSuccess = { response ->
-                                val text = response.getResponseText()
-                                if (text != null) {
-                                    TestResult(success = true, message = "Connected! Response: $text")
-                                } else {
-                                    TestResult(success = false, message = "No response text")
+                        try {
+                            isTesting = true
+                            testResult = null
+                            val result = apiClient.testConnection(webhookUrl, authToken)
+                            result.fold(
+                                onSuccess = {
+                                    testResult = TestResult(success = true, message = "Connection Successful!")
+                                    // Also mark as verified in repository
+                                    settings.webhookUrl = webhookUrl
+                                    settings.authToken = authToken
+                                    settings.isVerified = true
+                                },
+                                onFailure = {
+                                    testResult = TestResult(success = false, message = "Connection Failed: ${it.message}")
+                                    Toast.makeText(context, "Error: ${it.message}", Toast.LENGTH_LONG).show()
                                 }
-                            },
-                            onFailure = { error ->
-                                TestResult(success = false, message = error.message ?: "Connection failed")
-                            }
-                        )
-                        isTesting = false
+                            )
+                        } catch (e: Exception) {
+                            testResult = TestResult(success = false, message = "Error: ${e.message}")
+                        } finally {
+                            isTesting = false
+                        }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = when {
+                        testResult?.success == true -> Color(0xFF4CAF50)
+                        testResult?.success == false -> MaterialTheme.colorScheme.error
+                        else -> MaterialTheme.colorScheme.primary
+                    }
+                ),
                 enabled = webhookUrl.isNotBlank() && !isTesting
             ) {
                 if (isTesting) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
+                        modifier = Modifier.size(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text("Testing...")
                 } else {
-                    Icon(Icons.Default.NetworkCheck, contentDescription = null)
+                    val icon = when {
+                        testResult == null -> Icons.Default.NetworkCheck
+                        testResult?.success == true -> Icons.Default.Check
+                        else -> Icons.Default.Error
+                    }
+                    Icon(icon, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Test Connection")
+                    Text(testResult?.message ?: "Test Connection")
                 }
             }
 
-            // Test Result
+            // Detailed Test Result Card
             testResult?.let { result ->
                 Spacer(modifier = Modifier.height(12.dp))
                 Card(
@@ -220,7 +235,7 @@ fun SettingsScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Tips
             Card(

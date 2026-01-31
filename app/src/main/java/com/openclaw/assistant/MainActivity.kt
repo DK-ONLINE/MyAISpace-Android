@@ -16,6 +16,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,14 +25,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import com.openclaw.assistant.data.SettingsRepository
 import com.openclaw.assistant.service.HotwordService
 import com.openclaw.assistant.ui.theme.OpenClawAssistantTheme
@@ -102,11 +103,6 @@ class MainActivity : ComponentActivity() {
     private fun toggleHotwordService(enabled: Boolean) {
         settings.hotwordEnabled = enabled
         if (enabled) {
-            if (!settings.isConfigured()) {
-                Toast.makeText(this, "Please configure Webhook URL first", Toast.LENGTH_SHORT).show()
-                settings.hotwordEnabled = false
-                return
-            }
             HotwordService.start(this)
             Toast.makeText(this, "Hotword detection started", Toast.LENGTH_SHORT).show()
         } else {
@@ -124,11 +120,11 @@ fun MainScreen(
     onOpenAssistantSettings: () -> Unit,
     onToggleHotword: (Boolean) -> Unit
 ) {
-    // Re-check configuration when returning from settings
     var isConfigured by remember { mutableStateOf(settings.isConfigured()) }
     var hotwordEnabled by remember { mutableStateOf(settings.hotwordEnabled) }
     
     val lifecycleOwner = LocalLifecycleOwner.current
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
@@ -197,7 +193,6 @@ fun MainScreen(
                 switchValue = hotwordEnabled,
                 onSwitchChange = { enabled ->
                     if (enabled && !isConfigured) {
-                        // Don't enable if not configured
                         return@ActionCard
                     }
                     hotwordEnabled = enabled
@@ -218,6 +213,21 @@ fun MainScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             UsageCard()
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Manual Chat
+            val context = LocalContext.current
+            ActionCard(
+                icon = Icons.AutoMirrored.Filled.Chat,
+                title = "In-App Chat",
+                description = "Text & Voice Conversation",
+                actionText = "Open Chat",
+                onClick = {
+                    val intent = Intent(context, ChatActivity::class.java)
+                    context.startActivity(intent)
+                }
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

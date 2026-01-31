@@ -22,6 +22,7 @@
 
     <application
         android:allowBackup="false"
+        android:usesCleartextTraffic="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
@@ -48,6 +49,12 @@
             android:exported="false"
             android:theme="@style/Theme.OpenClawAssistant" />
 
+        <!-- チャットActivity -->
+        <activity
+            android:name=".ChatActivity"
+            android:exported="false"
+            android:theme="@style/Theme.OpenClawAssistant" />
+
         <!-- Voice Interaction Service (ホームボタン長押し) -->
         <service
             android:name=".service.OpenClawVoiceService"
@@ -60,6 +67,10 @@
                 <action android:name="android.service.voice.VoiceInteractionService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".service.OpenClawSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION" />
 
         <!-- Hotword Detection Service (常時聴取) -->
         <service

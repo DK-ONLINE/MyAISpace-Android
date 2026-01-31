@@ -30,7 +30,7 @@ class TTSManager(context: Context) {
                     tts?.setLanguage(Locale.getDefault())
                 }
                 // 読み上げ速度調整
-                tts?.setSpeechRate(1.0f)
+                tts?.setSpeechRate(1.5f)
                 tts?.setPitch(1.0f)
                 
                 // 初期化待ちの発話があれば実行

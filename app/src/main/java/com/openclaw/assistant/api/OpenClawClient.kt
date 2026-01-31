@@ -57,8 +57,9 @@ class OpenClawClient {
 
             client.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) {
+                    val errorBody = response.body?.string() ?: response.message
                     return@withContext Result.failure(
-                        IOException("HTTP ${response.code}: ${response.message}")
+                        IOException("HTTP ${response.code}: $errorBody")
                     )
                 }
 
@@ -72,6 +73,72 @@ class OpenClawClient {
                 // Extract response text from JSON
                 val text = extractResponseText(responseBody)
                 Result.success(OpenClawResponse(response = text ?: responseBody))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Test connection to the webhook
+     */
+    suspend fun testConnection(
+        webhookUrl: String,
+        authToken: String?
+    ): Result<Boolean> = withContext(Dispatchers.IO) {
+        try {
+            // Try a HEAD request first (lightweight)
+            var requestBuilder = Request.Builder()
+                .url(webhookUrl)
+                .head()
+
+            if (!authToken.isNullOrBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $authToken")
+            }
+
+            var request = requestBuilder.build()
+            
+            try {
+                client.newCall(request).execute().use { response ->
+                    if (response.isSuccessful) return@withContext Result.success(true)
+                    // If Method Not Allowed (405), try POST
+                    if (response.code == 405) {
+                         // Fallthrough to POST
+                    } else {
+                         return@withContext Result.failure(IOException("HTTP ${response.code}"))
+                    }
+                }
+            } catch (e: Exception) {
+                // Fallthrough to POST on error (some servers reject HEAD)
+            }
+
+            // Fallback: POST with dummy data
+            val requestBody = JsonObject().apply {
+                addProperty("message", "ping")
+                addProperty("session_id", "test-connection")
+            }
+            
+            val jsonBody = gson.toJson(requestBody)
+                .toRequestBody("application/json; charset=utf-8".toMediaType())
+
+            requestBuilder = Request.Builder()
+                .url(webhookUrl)
+                .post(jsonBody)
+                .addHeader("Content-Type", "application/json")
+
+            if (!authToken.isNullOrBlank()) {
+                requestBuilder.addHeader("Authorization", "Bearer $authToken")
+            }
+
+            request = requestBuilder.build()
+            
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) {
+                    Result.success(true)
+                } else {
+                    val errorBody = response.body?.string() ?: response.message
+                    Result.failure(IOException("HTTP ${response.code}: $errorBody"))
+                }
             }
         } catch (e: Exception) {
             Result.failure(e)
