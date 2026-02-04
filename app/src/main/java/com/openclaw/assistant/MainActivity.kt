@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.font.FontWeight
@@ -50,7 +51,7 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val allGranted = permissions.values.all { it }
         if (!allGranted) {
-            Toast.makeText(this, "Permissions required", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.permissions_required), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -99,7 +100,7 @@ class MainActivity : ComponentActivity() {
             try {
                 startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
             } catch (e2: Exception) {
-                Toast.makeText(this, "Could not open settings", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, getString(R.string.could_not_open_settings), Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -108,10 +109,10 @@ class MainActivity : ComponentActivity() {
         settings.hotwordEnabled = enabled
         if (enabled) {
             HotwordService.start(this)
-            Toast.makeText(this, "Hotword detection started", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.hotword_started), Toast.LENGTH_SHORT).show()
         } else {
             HotwordService.stop(this)
-            Toast.makeText(this, "Hotword detection stopped", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.hotword_stopped), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -159,13 +160,13 @@ fun MainScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("OpenClaw Assistant") },
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     IconButton(onClick = { showHowToUse = true }) {
-                        Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = "Help")
+                        Icon(Icons.AutoMirrored.Filled.HelpOutline, contentDescription = stringResource(R.string.how_to_use))
                     }
                     IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings_title))
                     }
                 }
             )
@@ -186,7 +187,7 @@ fun MainScreen(
 
             // Quick actions - 2 cards side by side
             Text(
-                text = "Activation Methods",
+                text = stringResource(R.string.activation_methods),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth()
@@ -206,8 +207,8 @@ fun MainScreen(
                         .weight(1f)
                         .fillMaxHeight(),
                     icon = Icons.Default.Home,
-                    title = "Home Button",
-                    description = if (isAssistantSet) "Active" else "Not Set",
+                    title = stringResource(R.string.home_button),
+                    description = if (isAssistantSet) stringResource(R.string.active) else stringResource(R.string.not_set),
                     isActive = isAssistantSet,
                     onClick = onOpenAssistantSettings,
                     showInfoIcon = true,
@@ -221,7 +222,7 @@ fun MainScreen(
                         .fillMaxHeight(),
                     icon = Icons.Default.Mic,
                     title = settings.getWakeWordDisplayName(),
-                    description = if (hotwordEnabled) "Active" else "Disabled",
+                    description = if (hotwordEnabled) stringResource(R.string.active) else stringResource(R.string.disabled),
                     isActive = hotwordEnabled,
                     showSwitch = true,
                     switchValue = hotwordEnabled,
@@ -251,7 +252,7 @@ fun MainScreen(
             ) {
                 Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null)
                 Spacer(modifier = Modifier.width(12.dp))
-                Text("Open Chat", fontSize = 18.sp, fontWeight = FontWeight.Medium)
+                Text(stringResource(R.string.open_chat), fontSize = 18.sp, fontWeight = FontWeight.Medium)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -259,7 +260,7 @@ fun MainScreen(
             // Configuration warning
             if (!isConfigured) {
                 WarningCard(
-                    message = "Please configure Webhook URL",
+                    message = stringResource(R.string.error_no_webhook),
                     onClick = onOpenSettings
                 )
             }
@@ -308,13 +309,13 @@ fun StatusCard(isConfigured: Boolean) {
             
             Column {
                 Text(
-                    text = if (isConfigured) "Ready" else "Setup Required",
+                    text = if (isConfigured) stringResource(R.string.ready) else stringResource(R.string.setup_required),
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
                 )
                 Text(
-                    text = if (isConfigured) "Connected to OpenClaw" else "Please configure Webhook URL",
+                    text = if (isConfigured) stringResource(R.string.connected_to_openclaw) else stringResource(R.string.error_no_webhook),
                     fontSize = 14.sp,
                     color = Color.White.copy(alpha = 0.9f)
                 )
@@ -374,7 +375,7 @@ fun ActionCard(
                 IconButton(onClick = onInfoClick ?: {}) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                        contentDescription = "Help",
+                        contentDescription = stringResource(R.string.how_to_use),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -405,10 +406,10 @@ fun UsageCard() {
         Column(
             modifier = Modifier.padding(16.dp)
         ) {
-            UsageStep(number = "1", text = "Long press Home or say Wake Word")
-            UsageStep(number = "2", text = "Ask your question or request")
-            UsageStep(number = "3", text = "OpenClaw reads the response aloud")
-            UsageStep(number = "4", text = "Continue conversation (session maintained)")
+            UsageStep(number = "1", text = stringResource(R.string.step_1))
+            UsageStep(number = "2", text = stringResource(R.string.step_2))
+            UsageStep(number = "3", text = stringResource(R.string.step_3))
+            UsageStep(number = "4", text = stringResource(R.string.step_4))
         }
     }
 }
@@ -523,7 +524,7 @@ fun CompactActionCard(
                     if (showInfoIcon) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.HelpOutline,
-                            contentDescription = "Help",
+                            contentDescription = stringResource(R.string.how_to_use),
                             tint = MaterialTheme.colorScheme.primary,
                             modifier = Modifier
                                 .size(20.dp)
@@ -565,18 +566,18 @@ fun CompactActionCard(
 fun HowToUseDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("How to Use") },
+        title = { Text(stringResource(R.string.how_to_use)) },
         text = {
             Column {
-                UsageStep(number = "1", text = "Long press Home or say Wake Word")
-                UsageStep(number = "2", text = "Ask your question or request")
-                UsageStep(number = "3", text = "OpenClaw reads the response aloud")
-                UsageStep(number = "4", text = "Continue conversation (session maintained)")
+                UsageStep(number = "1", text = stringResource(R.string.step_1))
+                UsageStep(number = "2", text = stringResource(R.string.step_2))
+                UsageStep(number = "3", text = stringResource(R.string.step_3))
+                UsageStep(number = "4", text = stringResource(R.string.step_4))
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Got it")
+                Text(stringResource(R.string.got_it))
             }
         }
     )
@@ -586,37 +587,35 @@ fun HowToUseDialog(onDismiss: () -> Unit) {
 fun TroubleshootingDialog(onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Assist Gesture Not Working?") },
+        title = { Text(stringResource(R.string.assist_gesture_not_working)) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 Text(
-                    "Even if set as default, some system features might override the long-press gesture.",
+                    stringResource(R.string.troubleshooting_intro),
                     fontSize = 14.sp
                 )
                 
                 BulletPoint(
-                    title = "Circle to Search (Overrides Long-Press)", 
-                    desc = "If holding the home button triggers a search screen:\n" +
-                           "• Pixel: Settings > System > Navigation mode > Tap Gear icon > Turn off Circle to Search.\n" +
-                           "• Samsung: Settings > Display > Navigation bar > Turn off Circle to Search."
+                    title = stringResource(R.string.circle_to_search_title), 
+                    desc = stringResource(R.string.circle_to_search_desc)
                 )
                 
                 BulletPoint(
-                    title = "Gesture Navigation (Corner Swipe)", 
-                    desc = "If you don't have a home button (swipe navigation), swipe up diagonally from either the bottom-left or bottom-right corner to launch the assistant."
+                    title = stringResource(R.string.gesture_navigation_title), 
+                    desc = stringResource(R.string.gesture_navigation_desc)
                 )
                 
                 BulletPoint(
-                    title = "Google App Setting", 
-                    desc = "Open Google App > Tap Profile > Settings > Google Assistant > General > Turn off 'Google Assistant' if it still interferes."
+                    title = stringResource(R.string.google_app_setting_title), 
+                    desc = stringResource(R.string.google_app_setting_desc)
                 )
 
                 BulletPoint(
-                    title = "Refresh Binding", 
-                    desc = "If status is 'Active' but it still won't work, try changing 'Digital assistant app' to 'None' and then back to 'OpenClaw Assistant'."
+                    title = stringResource(R.string.refresh_binding_title), 
+                    desc = stringResource(R.string.refresh_binding_desc)
                 )
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -634,13 +633,13 @@ fun TroubleshootingDialog(onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.tertiary)
                 ) {
-                    Text("Debug: Force Start Session")
+                    Text(stringResource(R.string.debug_force_start))
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text("Got it")
+                Text(stringResource(R.string.got_it))
             }
         }
     )

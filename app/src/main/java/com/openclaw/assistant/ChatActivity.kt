@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -81,7 +82,7 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                         if (checkPermission()) {
                             viewModel.startListening()
                         } else {
-                            Toast.makeText(this, "Microphone permission required", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(this, getString(R.string.mic_permission_required), Toast.LENGTH_SHORT).show()
                         }
                     },
                     onStopListening = { viewModel.stopListening() },
@@ -153,13 +154,13 @@ fun ChatScreen(
             TopAppBar(
                 title = { 
                     Text(
-                        "OpenClaw", 
+                        stringResource(R.string.app_name), 
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold 
                     ) 
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.back_button))
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -282,7 +283,7 @@ fun ThinkingIndicator() {
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Thinking...", 
+                stringResource(R.string.thinking), 
                 fontSize = 14.sp, 
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
@@ -307,14 +308,14 @@ fun SpeakingIndicator(onStop: () -> Unit) {
             Icon(Icons.Default.Mic, contentDescription = null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onErrorContainer)
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                "Speaking...", 
+                stringResource(R.string.speaking), 
                 fontSize = 14.sp, 
                 color = MaterialTheme.colorScheme.onErrorContainer,
                 fontWeight = androidx.compose.ui.text.font.FontWeight.Medium
             )
             Spacer(modifier = Modifier.width(8.dp))
             IconButton(onClick = onStop, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Stop, contentDescription = "Stop", tint = MaterialTheme.colorScheme.onErrorContainer)
+                Icon(Icons.Default.Stop, contentDescription = stringResource(R.string.stop_description), tint = MaterialTheme.colorScheme.onErrorContainer)
             }
         }
     }
@@ -341,7 +342,7 @@ fun ChatInputArea(
             modifier = Modifier
                 .weight(1f)
                 .padding(end = 8.dp),
-            placeholder = { Text("Ask OpenClaw...") },
+            placeholder = { Text(stringResource(R.string.ask_hint)) },
             maxLines = 4,
             shape = RoundedCornerShape(24.dp),
             colors = OutlinedTextFieldDefaults.colors(
@@ -368,7 +369,7 @@ fun ChatInputArea(
                 } else {
                      Icons.AutoMirrored.Filled.Send
                 },
-                contentDescription = "Send or Mic",
+                contentDescription = stringResource(R.string.send_description),
                 tint = Color.White
             )
         }
