@@ -27,10 +27,13 @@ class SpeechRecognizerManager(private val context: Context) {
 
     /**
      * 音声認識を開始し、結果をFlowで返す
+     * language が null の場合はシステムデフォルトを使用する
      */
-    fun startListening(language: String = "ja-JP"): Flow<SpeechResult> = callbackFlow {
-        // Skip isAvailable() check - MIUI may return false incorrectly
-        android.util.Log.e("SpeechRecognizerManager", "startListening called, isAvailable=${isAvailable()}")
+    fun startListening(language: String? = null): Flow<SpeechResult> = callbackFlow {
+        // デフォルト言語の決定
+        val targetLanguage = language ?: Locale.getDefault().toLanguageTag()
+        
+        android.util.Log.e("SpeechRecognizerManager", "startListening called, language=$targetLanguage, isAvailable=${isAvailable()}")
 
         // Clean slate: Ensure any previous instance is safely destroyed
         recognizer?.let { rec ->
@@ -119,9 +122,9 @@ class SpeechRecognizerManager(private val context: Context) {
 
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
-            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, language)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, targetLanguage)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, targetLanguage)
+            putExtra(RecognizerIntent.EXTRA_ONLY_RETURN_LANGUAGE_PREFERENCE, targetLanguage)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 1500L)

@@ -24,50 +24,17 @@ class TTSManager(context: Context) {
     private var pendingSpeak: (() -> Unit)? = null
 
     init {
-        Log.e(TAG, "Initializing TTS...")
-        // Try with explicit engine package name
-        val engine = "com.google.android.tts"
-        tts = TextToSpeech(context.applicationContext, { status ->
+        Log.e(TAG, "Initializing TTS with system default engine...")
+        // Use system default engine to support Samsung, Google, etc.
+        tts = TextToSpeech(context.applicationContext) { status ->
             Log.e(TAG, "TTS init callback, status=$status (SUCCESS=${TextToSpeech.SUCCESS})")
             if (status == TextToSpeech.SUCCESS) {
                 isInitialized = true
-                // 日本語を優先、なければデフォルト
-                val result = tts?.setLanguage(Locale.JAPANESE)
-                Log.e(TAG, "setLanguage result=$result")
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    tts?.setLanguage(Locale.getDefault())
-                }
-                // 読み上げ速度調整
-                tts?.setSpeechRate(1.5f)
-                tts?.setPitch(1.0f)
-                
-                // 初期化待ちの発話があれば実行
+                TTSUtils.setupVoice(tts)
                 pendingSpeak?.invoke()
                 pendingSpeak = null
             } else {
-                Log.e(TAG, "TTS init FAILED with status=$status, trying without engine...")
-                // Retry without specifying engine
-                tryInitWithoutEngine(context.applicationContext)
-            }
-        }, engine)
-    }
-
-    private fun tryInitWithoutEngine(context: Context) {
-        tts = TextToSpeech(context) { status ->
-            Log.e(TAG, "TTS retry init callback, status=$status")
-            if (status == TextToSpeech.SUCCESS) {
-                isInitialized = true
-                val result = tts?.setLanguage(Locale.JAPANESE)
-                Log.e(TAG, "setLanguage result=$result")
-                if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                    tts?.setLanguage(Locale.getDefault())
-                }
-                tts?.setSpeechRate(1.5f)
-                tts?.setPitch(1.0f)
-                pendingSpeak?.invoke()
-                pendingSpeak = null
-            } else {
-                Log.e(TAG, "TTS retry also FAILED with status=$status")
+                Log.e(TAG, "TTS init FAILED with status=$status")
             }
         }
     }
@@ -102,15 +69,16 @@ class TTSManager(context: Context) {
         }
 
         if (isInitialized) {
+            TTSUtils.applyLanguageForText(tts, text)
             tts?.setOnUtteranceProgressListener(listener)
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         } else {
-            // 初期化待ち - Listenerを保持してpendingSpeakで使用
+            // 初期化待ち
             pendingSpeak = {
+                TTSUtils.applyLanguageForText(tts, text)
                 tts?.setOnUtteranceProgressListener(listener)
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             }
-            // 初期化タイムアウト処理（3秒待っても初期化されなければfalseを返す）
             android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                 if (continuation.isActive && !isInitialized) {
                     pendingSpeak = null
@@ -153,12 +121,14 @@ class TTSManager(context: Context) {
         }
 
         if (isInitialized) {
+            TTSUtils.applyLanguageForText(tts, text)
             tts?.setOnUtteranceProgressListener(listener)
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             trySend(TTSState.Preparing)
         } else {
             trySend(TTSState.Preparing)
             pendingSpeak = {
+                TTSUtils.applyLanguageForText(tts, text)
                 tts?.setOnUtteranceProgressListener(listener)
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             }
@@ -174,6 +144,7 @@ class TTSManager(context: Context) {
      */
     fun speakQueued(text: String) {
         if (isInitialized) {
+            TTSUtils.applyLanguageForText(tts, text)
             val utteranceId = UUID.randomUUID().toString()
             tts?.speak(text, TextToSpeech.QUEUE_ADD, null, utteranceId)
         }

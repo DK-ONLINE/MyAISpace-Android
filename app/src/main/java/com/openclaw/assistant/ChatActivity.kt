@@ -39,6 +39,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.foundation.text.BasicTextField
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.openclaw.assistant.speech.TTSUtils
 import com.openclaw.assistant.ui.chat.ChatMessage
 import com.openclaw.assistant.ui.chat.ChatUiState
 import com.openclaw.assistant.ui.chat.ChatViewModel
@@ -58,6 +59,7 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
         // Initialize TTS with Activity context (important for MIUI!)
         Log.e(TAG, "Initializing TTS with Activity context...")
+        // Using system default engine (no explicit package name) for better compatibility
         tts = TextToSpeech(this, this)
 
         // Request Microphone permission if not granted
@@ -96,13 +98,7 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         Log.e(TAG, "TTS onInit callback, status=$status (SUCCESS=${TextToSpeech.SUCCESS})")
         if (status == TextToSpeech.SUCCESS) {
-            val result = tts?.setLanguage(Locale.JAPANESE)
-            Log.e(TAG, "TTS setLanguage result=$result")
-            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
-                tts?.setLanguage(Locale.getDefault())
-            }
-            tts?.setSpeechRate(1.5f)
-            tts?.setPitch(1.0f)
+            TTSUtils.setupVoice(tts)
             
             // Pass TTS to ViewModel
             tts?.let { viewModel.setTTS(it) }
