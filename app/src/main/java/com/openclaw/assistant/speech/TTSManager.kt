@@ -22,6 +22,7 @@ class TTSManager(private val context: Context) {
     private var tts: TextToSpeech? = null
     private var isInitialized = false
     private var pendingSpeak: (() -> Unit)? = null
+    private val settings = com.openclaw.assistant.data.SettingsRepository.getInstance(context)
 
     init {
         initializeWithBruteForce()
@@ -30,6 +31,26 @@ class TTSManager(private val context: Context) {
     private fun initializeWithBruteForce() {
         Log.e(TAG, "Force-starting TTS sequence...")
         
+        val preferredEngine = settings.ttsEngine
+        
+        if (preferredEngine.isNotEmpty()) {
+             // 0. Try Preferred Engine
+            Log.e(TAG, "Attempting to initialize with preferred engine: $preferredEngine")
+            tts = TextToSpeech(context.applicationContext, { status ->
+                if (status == TextToSpeech.SUCCESS) {
+                    Log.e(TAG, "Initialized with preferred engine: $preferredEngine")
+                    onInitSuccess()
+                } else {
+                    Log.e(TAG, "Preferred engine failed, falling back to Google/Default")
+                     tryGoogleOrFallback()
+                }
+            }, preferredEngine)
+        } else {
+            tryGoogleOrFallback()
+        }
+    }
+    
+    private fun tryGoogleOrFallback() {
         // 1. Try Google TTS explicitly
         tts = TextToSpeech(context.applicationContext, { status ->
             if (status == TextToSpeech.SUCCESS) {
@@ -52,7 +73,7 @@ class TTSManager(private val context: Context) {
 
     private fun onInitSuccess() {
         isInitialized = true
-        TTSUtils.setupVoice(tts)
+        TTSUtils.setupVoice(tts, settings.ttsSpeed)
         pendingSpeak?.invoke()
         pendingSpeak = null
     }
@@ -76,12 +97,12 @@ class TTSManager(private val context: Context) {
         }
 
         if (isInitialized) {
-            TTSUtils.applyLanguageForText(tts, text)
+            TTSUtils.applyUserConfig(tts, settings.ttsSpeed)
             tts?.setOnUtteranceProgressListener(listener)
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
         } else {
             pendingSpeak = {
-                TTSUtils.applyLanguageForText(tts, text)
+                TTSUtils.applyUserConfig(tts, settings.ttsSpeed)
                 tts?.setOnUtteranceProgressListener(listener)
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             }
@@ -103,14 +124,14 @@ class TTSManager(private val context: Context) {
         }
 
         if (isInitialized) {
-            TTSUtils.applyLanguageForText(tts, text)
+            TTSUtils.applyUserConfig(tts, settings.ttsSpeed)
             tts?.setOnUtteranceProgressListener(listener)
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             trySend(TTSState.Preparing)
         } else {
             trySend(TTSState.Preparing)
             pendingSpeak = {
-                TTSUtils.applyLanguageForText(tts, text)
+                TTSUtils.applyUserConfig(tts, settings.ttsSpeed)
                 tts?.setOnUtteranceProgressListener(listener)
                 tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
             }
@@ -120,7 +141,7 @@ class TTSManager(private val context: Context) {
 
     fun speakQueued(text: String) {
         if (isInitialized) {
-            TTSUtils.applyLanguageForText(tts, text)
+            TTSUtils.applyUserConfig(tts, settings.ttsSpeed)
             tts?.speak(text, TextToSpeech.QUEUE_ADD, null, UUID.randomUUID().toString())
         }
     }
