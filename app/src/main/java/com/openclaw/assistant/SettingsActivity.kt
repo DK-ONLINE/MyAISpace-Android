@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -58,6 +59,8 @@ fun SettingsScreen(
     onSave: () -> Unit,
     onBack: () -> Unit
 ) {
+    val context = LocalContext.current
+    
     var webhookUrl by remember { mutableStateOf(settings.webhookUrl) }
     var authToken by remember { mutableStateOf(settings.authToken) }
     var ttsEnabled by remember { mutableStateOf(settings.ttsEnabled) }
@@ -74,7 +77,6 @@ fun SettingsScreen(
     var showWakeWordMenu by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
-    val context = LocalContext.current
     val apiClient = remember { OpenClawClient() }
     
     var isTesting by remember { mutableStateOf(false) }

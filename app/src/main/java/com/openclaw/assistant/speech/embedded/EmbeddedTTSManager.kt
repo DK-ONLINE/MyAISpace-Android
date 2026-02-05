@@ -17,7 +17,9 @@ import java.util.Locale
  * Manager for embedded TTS engine (Sherpa-ONNX implementation)
  */
 class EmbeddedTTSManager(private val context: Context) {
-    private const val TAG = "EmbeddedTTSManager"
+    companion object {
+        private const val TAG = "EmbeddedTTSManager"
+    }
     
     private var tts: OfflineTts? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
