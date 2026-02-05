@@ -73,6 +73,9 @@
     <string name="voice">Voice</string>
     <string name="wake_word">Wake Word</string>
     <string name="voice_output">Voice Output</string>
+    <string name="voice_speed">Voice Speed</string>
+    <string name="tts_engine_label">TTS Engine</string>
+    <string name="tts_engine_auto">Auto (Default)</string>
     <string name="read_ai_responses">Read AI responses aloud</string>
     <string name="continuous_conversation">Continuous Conversation</string>
     <string name="auto_start_mic">Auto-start mic after AI speaks</string>

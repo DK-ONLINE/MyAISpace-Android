@@ -51,6 +51,8 @@ import androidx.compose.material3.TextButton
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+import com.openclaw.assistant.data.SettingsRepository
+
 private const val TAG = "ChatActivity"
 
 class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
@@ -58,9 +60,11 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val viewModel: ChatViewModel by viewModels()
     private var tts: TextToSpeech? = null
     private var isRetry = false
+    private lateinit var settings: SettingsRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        settings = SettingsRepository.getInstance(this)
 
         // Initialize TTS with Activity context (important for MIUI!)
         // Try Google TTS first for better compatibility on Chinese ROMs
@@ -107,10 +111,18 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     }
 
     private fun initializeTTS() {
-        Log.e(TAG, "Initializing TTS with Google engine priority (isRetry=$isRetry)...")
-        if (!isRetry) {
+        Log.e(TAG, "Initializing TTS (isRetry=$isRetry)...")
+        
+        val preferredEngine = settings.ttsEngine
+        
+        if (!isRetry && preferredEngine.isNotEmpty()) {
+             Log.e(TAG, "Trying preferred engine: $preferredEngine")
+             tts = TextToSpeech(this, this, preferredEngine)
+        } else if (!isRetry) {
+             Log.e(TAG, "Trying Google TTS priority")
             tts = TextToSpeech(this, this, TTSUtils.GOOGLE_TTS_PACKAGE)
         } else {
+            Log.e(TAG, "Retry/Fallback to default engine")
             tts = TextToSpeech(this, this)
         }
     }
@@ -118,7 +130,7 @@ class ChatActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     override fun onInit(status: Int) {
         Log.e(TAG, "TTS onInit callback, status=$status (SUCCESS=${TextToSpeech.SUCCESS})")
         if (status == TextToSpeech.SUCCESS) {
-            TTSUtils.setupVoice(tts)
+            TTSUtils.setupVoice(tts, settings.ttsSpeed)
             
             // Pass TTS to ViewModel
             tts?.let { viewModel.setTTS(it) }

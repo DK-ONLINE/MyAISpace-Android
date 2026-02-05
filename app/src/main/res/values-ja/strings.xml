@@ -73,6 +73,9 @@
     <string name="voice">音声</string>
     <string name="wake_word">ウェイクワード</string>
     <string name="voice_output">音声出力</string>
+    <string name="voice_speed">読み上げ速度</string>
+    <string name="tts_engine_label">TTSエンジン</string>
+    <string name="tts_engine_auto">自動 (デフォルト)</string>
     <string name="read_ai_responses">AIの応答を読み上げる</string>
     <string name="continuous_conversation">連続会話</string>
     <string name="auto_start_mic">AI発話後に自動でマイクを起動</string>

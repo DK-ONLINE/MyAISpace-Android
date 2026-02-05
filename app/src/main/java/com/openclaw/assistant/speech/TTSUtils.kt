@@ -15,7 +15,7 @@ object TTSUtils {
     /**
      * ロケールと高品質な音声のセットアップ
      */
-    fun setupVoice(tts: TextToSpeech?) {
+    fun setupVoice(tts: TextToSpeech?, speed: Float) {
         val currentLocale = Locale.getDefault()
         Log.e(TAG, "Current system locale: $currentLocale")
 
@@ -55,42 +55,15 @@ object TTSUtils {
             Log.e(TAG, "Error selecting voice: ${e.message}")
         }
 
-        // 言語に応じた速度調整
-        val rate = if (tts?.language?.language == "ja") 1.5f else 1.2f
-        tts?.setSpeechRate(rate)
-        tts?.setPitch(1.0f)
+        applyUserConfig(tts, speed)
     }
 
     /**
-     * テキスト内容に応じてTTSの言語や読み上げ速度を簡易的に切り替える。
+     * ユーザー設定の速度を適用する
      */
-    fun applyLanguageForText(tts: TextToSpeech?, text: String) {
-        if (text.isEmpty() || tts == null) return
-
-        // 効率のため最初の100文字程度で判定
-        val sample = text.take(100)
-
-        // 漢字、ひらがな、カタカナのチェック
-        val hasJapanese = sample.any {
-            it in '\u3040'..'\u309F' || // Hiragana
-            it in '\u30A0'..'\u30FF' || // Katakana
-            it in '\u4E00'..'\u9FAF'    // Kanji
-        }
-
-        if (hasJapanese) {
-            tts.language = Locale.JAPANESE
-            tts.setSpeechRate(1.5f)
-        } else {
-            val hasLatin = sample.any { it in 'a'..'z' || it in 'A'..'Z' }
-            if (hasLatin) {
-                tts.language = Locale.US
-                tts.setSpeechRate(1.2f)
-            } else {
-                // 日本語も英語も含まれない場合はシステムデフォルトに戻す
-                val defaultLocale = Locale.getDefault()
-                tts.language = defaultLocale
-                tts.setSpeechRate(1.0f)
-            }
-        }
+    fun applyUserConfig(tts: TextToSpeech?, speed: Float) {
+        if (tts == null) return
+        tts.setSpeechRate(speed)
+        tts.setPitch(1.0f)
     }
 }
