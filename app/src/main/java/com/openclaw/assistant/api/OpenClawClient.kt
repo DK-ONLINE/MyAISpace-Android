@@ -2,6 +2,7 @@ package com.openclaw.assistant.api
 
 import com.google.gson.Gson
 import com.google.gson.JsonObject
+import com.openclaw.assistant.util.NetworkUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
@@ -34,6 +35,12 @@ class OpenClawClient {
         authToken: String? = null
     ): Result<OpenClawResponse> = withContext(Dispatchers.IO) {
         try {
+            if (!NetworkUtils.isUrlSecure(webhookUrl)) {
+                return@withContext Result.failure(
+                    SecurityException("Insecure connection: HTTP is only allowed for local networks.")
+                )
+            }
+
             // Simple request body for /hooks/voice
             val requestBody = JsonObject().apply {
                 addProperty("message", message)
@@ -87,6 +94,12 @@ class OpenClawClient {
         authToken: String?
     ): Result<Boolean> = withContext(Dispatchers.IO) {
         try {
+            if (!NetworkUtils.isUrlSecure(webhookUrl)) {
+                return@withContext Result.failure(
+                    SecurityException("Insecure connection: HTTP is only allowed for local networks.")
+                )
+            }
+
             // Try a HEAD request first (lightweight)
             var requestBuilder = Request.Builder()
                 .url(webhookUrl)
