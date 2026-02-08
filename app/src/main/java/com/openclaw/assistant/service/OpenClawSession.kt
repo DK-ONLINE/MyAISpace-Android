@@ -308,40 +308,17 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context),
         displayText.value = ""
 
         scope.launch {
-            val result = apiClient.sendMessage(
-                webhookUrl = settings.webhookUrl,
-                message = message,
-                sessionId = settings.sessionId,
-                authToken = settings.authToken.takeIf { it.isNotBlank() }
-            )
-
-            result.fold(
-                onSuccess = { response ->
-                    val responseText = response.getResponseText()
-                    if (responseText != null) {
-                        displayText.value = responseText
-                        if (settings.ttsEnabled) {
-                            speakResponse(responseText)
-                        } else if (settings.continuousMode) {
-                            scope.launch {
-                                delay(500)
-                                startListening()
-                            }
-                        }
-                    } else if (response.error != null) {
-                        currentState.value = AssistantState.ERROR
-                        errorMessage.value = response.error
-                    } else {
-                        currentState.value = AssistantState.ERROR
-                        errorMessage.value = "No response"
-                    }
-                },
-                onFailure = { error ->
-                    Log.e(TAG, "API error", error)
-                    currentState.value = AssistantState.ERROR
-                    errorMessage.value = error.message ?: "Network error"
-                }
-            )
+            try {
+                apiClient.sendMessage(
+                    message = message,
+                    sessionId = settings.sessionId,
+                    authToken = settings.authToken.takeIf { it.isNotBlank() }
+                )
+            } catch (error: Exception) {
+                Log.e(TAG, "WebSocket Send error", error)
+                currentState.value = AssistantState.ERROR
+                errorMessage.value = error.message ?: "Failed to send message over WebSocket"
+            }
         }
     }
 

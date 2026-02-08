@@ -11,12 +11,12 @@ import com.openclaw.assistant.api.OpenClawClient
 import com.openclaw.assistant.data.SettingsRepository
 import com.openclaw.assistant.speech.SpeechRecognizerManager
 import com.openclaw.assistant.speech.SpeechResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.util.Locale
 import java.util.UUID
 import kotlin.coroutines.resume
 
@@ -35,7 +35,8 @@ data class ChatUiState(
     val isThinking: Boolean = false,
     val isSpeaking: Boolean = false,
     val error: String? = null,
-    val partialText: String = "" // For real-time speech transcription
+    val partialText: String = "", // For real-time speech transcription
+    val isConnected: Boolean = false
 )
 
 class ChatViewModel(application: Application) : AndroidViewModel(application) {
@@ -46,10 +47,79 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val settings = SettingsRepository.getInstance(application)
     private val apiClient = OpenClawClient()
     private val speechManager = SpeechRecognizerManager(application)
-    
+
     // TTS will be set from Activity
     private var tts: TextToSpeech? = null
     private var isTTSReady = false
+    private var isResponseCollectorRunning = false
+
+    init {
+        // Start connection and response collection flow immediately
+        connectAndCollect()
+    }
+
+    private fun connectAndCollect() {
+        if (settings.isConfigured() && !apiClient.isConnected() && !isResponseCollectorRunning) {
+            
+            // 1. Connect
+            val connectResult = apiClient.connect(
+                settings.webhookUrl, // This field now holds the Gateway WS URL
+                settings.authToken.takeIf { it.isNotBlank() }
+            )
+            
+            connectResult.onFailure { error ->
+                _uiState.update { it.copy(error = "Connection failed: ${error.message}", isConnected = false) }
+            }
+            
+            if (connectResult.isSuccess) {
+                _uiState.update { it.copy(isConnected = true, error = null) }
+            }
+        }
+        
+        // 2. Start collecting responses if not already running
+        if (!isResponseCollectorRunning) {
+            isResponseCollectorRunning = true
+            viewModelScope.launch {
+                apiClient.responseFlow.collect { response ->
+                    handleIncomingResponse(response)
+                }
+            }.invokeOnCompletion { 
+                isResponseCollectorRunning = false 
+            }
+        }
+    }
+
+    private fun handleIncomingResponse(response: com.openclaw.assistant.api.OpenClawResponse) {
+        // Handle connection status/error messages first
+        if (response.response == "CONNECTED") {
+            // Initial connection message (ignore or log)
+            return
+        }
+
+        if (!response.error.isNullOrBlank()) {
+            _uiState.update { it.copy(isThinking = false, error = response.error, isConnected = apiClient.isConnected()) }
+            addMessage("System Error: ${response.error}", isUser = false)
+            return
+        }
+        
+        // Handle successful AI response
+        val responseText = response.getResponseText() ?: "No response"
+        addMessage(responseText, isUser = false)
+        _uiState.update { it.copy(isThinking = false) }
+        
+        if (settings.ttsEnabled) {
+            speak(responseText)
+        } else if (lastInputWasVoice && settings.continuousMode) {
+            // If TTS is disabled but we're in continuous mode, restart listening directly
+            viewModelScope.launch {
+                kotlinx.coroutines.delay(500)
+                startListening()
+            }
+        } else {
+            // Resume hotword only if we aren't continuing
+            sendResumeBroadcast()
+        }
+    }
 
     /**
      * ActivityからTTSを設定する
@@ -62,52 +132,46 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     fun sendMessage(text: String) {
         if (text.isBlank()) return
+        
+        // Ensure connection is attempted before sending
+        if (!apiClient.isConnected()) {
+            connectAndCollect()
+            if (!apiClient.isConnected()) {
+                _uiState.update { it.copy(error = "Gateway is not connected. Check settings.") }
+                return
+            }
+        }
 
         // Add user message
         addMessage(text, isUser = true)
         _uiState.update { it.copy(isThinking = true) }
 
-        viewModelScope.launch {
-            try {
-                val result = apiClient.sendMessage(
-                    webhookUrl = settings.webhookUrl,
-                    message = text,
-                    sessionId = settings.sessionId,
-                    authToken = settings.authToken.takeIf { it.isNotBlank() }
-                )
-
-                result.fold(
-                    onSuccess = { response ->
-                        val responseText = response.getResponseText() ?: "No response"
-                        addMessage(responseText, isUser = false)
-                        _uiState.update { it.copy(isThinking = false) }
-                        if (settings.ttsEnabled) {
-                            speak(responseText)
-                        } else if (lastInputWasVoice && settings.continuousMode) {
-                            // If TTS is disabled but we're in continuous mode, restart listening directly
-                            viewModelScope.launch {
-                                kotlinx.coroutines.delay(500)
-                                startListening()
-                            }
-                        }
-                    },
-                    onFailure = { error ->
-                        _uiState.update { it.copy(isThinking = false, error = error.message) }
-                        addMessage("Error: ${error.message}", isUser = false)
-                    }
-                )
-            } catch (e: Exception) {
-                _uiState.update { it.copy(isThinking = false, error = e.message) }
-            }
-        }
+        // Send message asynchronously (fire and forget)
+        apiClient.sendMessage(
+            message = text,
+            sessionId = settings.sessionId,
+            authToken = settings.authToken.takeIf { it.isNotBlank() }
+        )
+        
+        // The response will be handled by the collect block
     }
 
     private var lastInputWasVoice = false
-    private var listeningJob: kotlinx.coroutines.Job? = null
+    private var listeningJob: Job? = null
 
     fun startListening() {
         Log.e(TAG, "startListening() called, isListening=${_uiState.value.isListening}")
         if (_uiState.value.isListening) return
+
+        // Ensure connection is ready if we are starting via voice
+        if (!apiClient.isConnected()) {
+            connectAndCollect()
+            if (!apiClient.isConnected()) {
+                _uiState.update { it.copy(error = "Gateway is not connected. Check settings.") }
+                // Don't proceed with listening if not connected
+                return
+            }
+        }
 
         // Pause Hotword Service to prevent microphone conflict
         sendPauseBroadcast()
@@ -168,12 +232,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
             } finally {
                 // If the loop finishes (e.g. error or spoken), and we are NOT continuing to speak/think immediately,
                 // we might want to resume hotword...
-                // HOWEVER: if we successfully spoke, we are now "Thinking" or "Speaking", so we shouldn't resume yet.
-                // We only resume if we are truly done (e.g. stopped listening without input).
-                
-                // But actually, sendMessage() triggers Thinking -> Speaking -> (maybe) startListening again.
-                // So we should only resume hotword if we are definitely NOT going to loop back.
-                
                 if (!lastInputWasVoice) {
                     sendResumeBroadcast()
                 }
@@ -210,8 +268,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 // Restart listening (which will pause hotword again if needed, though it should still be paused)
                 startListening()
             } else {
-                // Conversation ended
-                sendResumeBroadcast()
+                // Conversation ended, hotword resume handled by handleIncomingResponse
             }
         }
     }
@@ -275,9 +332,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        apiClient.disconnect()
         speechManager.destroy()
         sendResumeBroadcast()
-        // Don't shutdown TTS here - Activity owns it
     }
 
     private fun sendPauseBroadcast() {
