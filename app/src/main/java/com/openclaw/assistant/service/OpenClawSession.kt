@@ -369,7 +369,7 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context),
             try {
                 apiClient.sendMessage(
                     message = message,
-                    sessionId = settings.sessionId,
+                    sessionKey = settings.sessionId,
                     authToken = settings.authToken.takeIf { it.isNotBlank() }
                 )
             } catch (error: Exception) {

@@ -149,7 +149,7 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         // Send message asynchronously (fire and forget)
         apiClient.sendMessage(
             message = text,
-            sessionId = settings.sessionId,
+            sessionKey = settings.sessionId,
             authToken = settings.authToken.takeIf { it.isNotBlank() }
         )
         
