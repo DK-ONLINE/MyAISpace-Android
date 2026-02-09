@@ -1,5 +1,6 @@
 package com.openclaw.assistant.api
 
+import android.util.Log
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import kotlinx.coroutines.channels.Channel
@@ -14,17 +15,21 @@ import java.util.concurrent.atomic.AtomicLong
  */
 class OpenClawClient {
 
+    companion object {
+        private const val TAG = "OpenClawClient"
+    }
+
     private val client = OkHttpClient.Builder()
-        .connectTimeout(10, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.SECONDS) // Use a large timeout for the WS
-        .writeTimeout(10, TimeUnit.SECONDS)
+        .writeTimeout(15, TimeUnit.SECONDS)
         .pingInterval(30, TimeUnit.SECONDS)
         .build()
 
     private val gson = Gson()
     private var webSocket: WebSocket? = null
     private var isConnected: Boolean = false
-    private val callId = AtomicLong(0)
+    private val callId = AtomicLong(System.currentTimeMillis())
 
     // Channel to pass incoming messages (responses) back to the caller
     private val _responseChannel = Channel<OpenClawResponse>(Channel.UNLIMITED)
@@ -38,7 +43,8 @@ class OpenClawClient {
         try {
             // Note: We MUST convert http/https to ws/wss for OkHttp
             val wsUrl = gatewayUrl.replace("http", "ws")
-            
+            Log.d(TAG, "Connecting to WebSocket: $wsUrl")
+
             val requestBuilder = Request.Builder().url(wsUrl)
             
             if (!authToken.isNullOrEmpty()) {
@@ -47,16 +53,17 @@ class OpenClawClient {
             
             val request = requestBuilder.build()
             webSocket = client.newWebSocket(request, WebSocketListenerImpl())
-            // We return success here and let the listener handle the final state
             return Result.success(true)
         } catch (e: Exception) {
             isConnected = false
             webSocket = null
+            Log.e(TAG, "Connection attempt failed", e)
             return Result.failure(e)
         }
     }
 
     fun disconnect() {
+        Log.d(TAG, "Disconnecting WebSocket")
         webSocket?.close(1000, "User disconnect")
         isConnected = false
         webSocket = null
@@ -68,18 +75,20 @@ class OpenClawClient {
     fun sendMessage(
         message: String,
         sessionId: String,
-        authToken: String? = null // Auth token is passed in the URL header for WS connection, keeping it here for now
+        authToken: String? = null
     ) {
         if (!isConnected || webSocket == null) {
+            Log.e(TAG, "Cannot send message: Not connected")
             _responseChannel.trySend(OpenClawResponse(error = "Gateway not connected. Please check settings."))
             return
         }
         
         val id = callId.incrementAndGet().toString()
 
+        // Construct the message matching OpenClaw Node protocol
         val data = JsonObject().apply {
             addProperty("message", message)
-            addProperty("sessionKey", sessionId) // Assuming sessionId stores the sessionKey ('main')
+            addProperty("sessionKey", sessionId)
             addProperty("agentId", "main")
         }
 
@@ -89,13 +98,15 @@ class OpenClawClient {
             add("data", data)
         }
 
-        webSocket?.send(gson.toJson(nodeMessage))
-        // Response will be received asynchronously via responseFlow
+        val json = gson.toJson(nodeMessage)
+        Log.d(TAG, "Sending WebSocket frame: $json")
+        val success = webSocket?.send(json) ?: false
+        if (!success) {
+            Log.e(TAG, "Failed to queue WebSocket frame")
+            _responseChannel.trySend(OpenClawResponse(error = "Failed to send message frame"))
+        }
     }
 
-    /**
-     * Test connection is now a simple connect/disconnect attempt.
-     */
     suspend fun testConnection(
         gatewayUrl: String,
         authToken: String?
@@ -103,16 +114,16 @@ class OpenClawClient {
 
     private inner class WebSocketListenerImpl : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
+            Log.i(TAG, "WebSocket Connected")
             isConnected = true
-            // Immediately send the first user message: hello
-            sendMessage("Hello from new MyAISpace Android Node", "main", null)
             _responseChannel.trySend(OpenClawResponse(response = "CONNECTED"))
+            // REMOVED immediate sendMessage here to avoid 1008 error
         }
 
         override fun onMessage(webSocket: WebSocket, text: String) {
+            Log.d(TAG, "Received message: $text")
             try {
                 val json = gson.fromJson(text, JsonObject::class.java)
-                // Filter for "agent.turn" or "session.message" events
                 val kind = json.get("kind")?.asString
 
                 if (kind == "session.message" || kind == "agent.turn") {
@@ -121,19 +132,22 @@ class OpenClawClient {
                     _responseChannel.trySend(OpenClawResponse(response = message))
                 }
             } catch (e: Exception) {
-                // Log or ignore malformed JSON/non-chat messages
+                Log.w(TAG, "Error parsing incoming message", e)
             }
         }
 
         override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+            Log.w(TAG, "WebSocket Closing: $code / $reason")
             isConnected = false
             _responseChannel.trySend(OpenClawResponse(error = "Disconnected ($code: $reason)"))
             this@OpenClawClient.webSocket = null
         }
 
         override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            Log.e(TAG, "WebSocket Failure", t)
             isConnected = false
-            _responseChannel.trySend(OpenClawResponse(error = "Connection failed: ${t.message}"))
+            val errorMsg = response?.message ?: t.message ?: "Unknown error"
+            _responseChannel.trySend(OpenClawResponse(error = "Connection failed: $errorMsg"))
             this@OpenClawClient.webSocket = null
         }
     }
