@@ -166,9 +166,24 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context),
             displayText.value = "Configuration required"
             return
         }
-
-        // 音声認識開始
-        startListening()
+        
+        // Explicitly connect to the gateway
+        scope.launch {
+            val result = apiClient.connect(settings.webhookUrl, settings.authToken)
+            result.fold(
+                onSuccess = {
+                    Log.d(TAG, "Initial WebSocket connection succeeded.")
+                    // 音声認識開始
+                    startListening()
+                },
+                onFailure = {
+                    currentState.value = AssistantState.ERROR
+                    errorMessage.value = it.message
+                    displayText.value = "Connection Failed"
+                    Log.e(TAG, "Initial WebSocket connection failed: ${it.message}")
+                }
+            )
+        }
     }
     
     override fun onHide() {
