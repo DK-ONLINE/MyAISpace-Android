@@ -38,7 +38,14 @@ class OpenClawClient {
         try {
             // Note: We MUST convert http/https to ws/wss for OkHttp
             val wsUrl = gatewayUrl.replace("http", "ws")
-            val request = Request.Builder().url(wsUrl).build()
+            
+            val requestBuilder = Request.Builder().url(wsUrl)
+            
+            if (!authToken.isNullOrEmpty()) {
+                requestBuilder.header("Authorization", "Bearer $authToken")
+            }
+            
+            val request = requestBuilder.build()
             webSocket = client.newWebSocket(request, WebSocketListenerImpl())
             // We return success here and let the listener handle the final state
             return Result.success(true)

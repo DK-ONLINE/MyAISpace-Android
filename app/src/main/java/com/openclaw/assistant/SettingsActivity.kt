@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openclaw.assistant.api.OpenClawClient
+import com.openclaw.assistant.api.AppUpdateChecker
 import com.openclaw.assistant.data.SettingsRepository
 import com.openclaw.assistant.ui.theme.OpenClawAssistantTheme
 import kotlinx.coroutines.launch
@@ -350,6 +351,57 @@ fun SettingsScreen(
                                 Text(stringResource(R.string.custom_wake_word_help), color = Color.Gray, fontSize = 12.sp)
                             }
                         )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // === ABOUT / UPDATE SECTION ===
+            Text(
+                text = stringResource(R.string.about),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                )
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    val updateChecker = remember { AppUpdateChecker() }
+
+                    Text(
+                        text = stringResource(R.string.current_version_label, updateChecker.CURRENT_VERSION),
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val result = updateChecker.checkForUpdate()
+                                val message = if (result.needsUpdate) {
+                                    context.getString(
+                                        R.string.update_available,
+                                        result.latest,
+                                        result.downloadUrl
+                                    )
+                                } else {
+                                    context.getString(R.string.no_update)
+                                }
+                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.Update, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(stringResource(R.string.check_for_updates))
                     }
                 }
             }

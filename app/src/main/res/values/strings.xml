@@ -92,4 +92,11 @@
     <string name="wake_word_jarvis">Jarvis</string>
     <string name="wake_word_computer">Computer</string>
     <string name="wake_word_custom">Custom…</string>
+    
+    <!-- App Update -->
+    <string name="about">About</string>
+    <string name="current_version_label">Current Version: %s</string>
+    <string name="check_for_updates">Check for Updates</string>
+    <string name="no_update">You are running the latest version.</string>
+    <string name="update_available">Update available: %1$s\nDownload link: %2$s</string>
 </resources>
