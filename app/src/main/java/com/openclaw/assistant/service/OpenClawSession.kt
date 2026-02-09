@@ -173,6 +173,8 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context),
             result.fold(
                 onSuccess = {
                     Log.d(TAG, "Initial WebSocket connection succeeded.")
+                    // Start collecting responses from the gateway
+                    startResponseCollection()
                     // 音声認識開始
                     startListening()
                 },
@@ -183,6 +185,47 @@ class OpenClawSession(context: Context) : VoiceInteractionSession(context),
                     Log.e(TAG, "Initial WebSocket connection failed: ${it.message}")
                 }
             )
+        }
+    }
+    
+    private var responseCollectionJob: Job? = null
+    
+    private fun startResponseCollection() {
+        responseCollectionJob?.cancel()
+        responseCollectionJob = scope.launch {
+            apiClient.responseFlow.collectLatest { response ->
+                // Handle connection status
+                if (response.response == "CONNECTED") {
+                    Log.d(TAG, "Gateway connection confirmed")
+                    return@collectLatest
+                }
+                
+                // Handle errors
+                if (!response.error.isNullOrBlank()) {
+                    Log.e(TAG, "Gateway error: ${response.error}")
+                    currentState.value = AssistantState.ERROR
+                    errorMessage.value = response.error
+                    return@collectLatest
+                }
+                
+                // Handle AI response
+                val responseText = response.getResponseText()
+                if (!responseText.isNullOrBlank()) {
+                    displayText.value = responseText
+                    
+                    if (settings.ttsEnabled) {
+                        speakResponse(responseText)
+                    } else {
+                        // Not speaking, update state based on continuous mode
+                        if (settings.continuousMode) {
+                            delay(500)
+                            startListening()
+                        } else {
+                            currentState.value = AssistantState.IDLE
+                        }
+                    }
+                }
+            }
         }
     }
     
