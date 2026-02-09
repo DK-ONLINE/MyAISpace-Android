@@ -338,13 +338,13 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         sendResumeBroadcast()
     }
 
-    private fun sendPauseBroadcast() {
+    fun sendPauseBroadcast() {
         val intent = android.content.Intent("com.openclaw.assistant.ACTION_PAUSE_HOTWORD")
         intent.setPackage(getApplication<Application>().packageName)
         getApplication<Application>().sendBroadcast(intent)
     }
     
-    private fun sendResumeBroadcast() {
+    fun sendResumeBroadcast() {
         val intent = android.content.Intent("com.openclaw.assistant.ACTION_RESUME_HOTWORD")
         intent.setPackage(getApplication<Application>().packageName)
         getApplication<Application>().sendBroadcast(intent)
