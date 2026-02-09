@@ -1,5 +1,6 @@
 package com.openclaw.assistant.api
 
+import com.openclaw.assistant.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -13,7 +14,7 @@ class AppUpdateChecker {
     private val DOWNLOAD_LINK = "https://github.com/DK-ONLINE/MyAISpace-Android/releases/latest"
 
     // This should be pulled from the app's BuildConfig.VERSION_NAME
-    val CURRENT_VERSION = "0.9.0-alpha" 
+    val CURRENT_VERSION = BuildConfig.VERSION_NAME
 
     data class UpdateResult(
         val needsUpdate: Boolean,
