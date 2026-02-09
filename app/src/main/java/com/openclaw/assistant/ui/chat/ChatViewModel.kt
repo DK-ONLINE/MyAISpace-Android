@@ -103,9 +103,10 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
         }
         
         // Handle successful AI response
-        val responseText = response.getResponseText() ?: "No response"
-        addMessage(responseText, isUser = false)
-        _uiState.update { it.copy(isThinking = false) }
+        val responseText = response.getResponseText() 
+        if (!responseText.isNullOrBlank()) { // Use isNullOrBlank for robustness
+            addMessage(responseText, isUser = false)
+            _uiState.update { it.copy(isThinking = false) }
         
         if (settings.ttsEnabled) {
             speak(responseText)
