@@ -24,7 +24,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.openclaw.assistant.api.OpenClawClient
-import com.openclaw.assistant.api.AppUpdateChecker
 import com.openclaw.assistant.data.SettingsRepository
 import com.openclaw.assistant.ui.theme.OpenClawAssistantTheme
 import kotlinx.coroutines.launch
@@ -372,37 +371,36 @@ fun SettingsScreen(
                 )
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    val updateChecker = remember { AppUpdateChecker() }
-
-                    Text(
-                        text = stringResource(R.string.current_version_label, updateChecker.CURRENT_VERSION),
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    Button(
-                        onClick = {
-                            scope.launch {
-                                val result = updateChecker.checkForUpdate()
-                                val message = if (result.needsUpdate) {
-                                    context.getString(
-                                        R.string.update_available,
-                                        result.latest,
-                                        result.downloadUrl
-                                    )
-                                } else {
-                                    context.getString(R.string.no_update)
-                                }
-                                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth()
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Update, contentDescription = null)
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(stringResource(R.string.check_for_updates))
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "OpenClaw Assistant",
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            Text(
+                                text = "Version ${BuildConfig.VERSION_NAME}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color.Gray
+                            )
+                        }
                     }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Text(
+                        text = "A voice-activated AI assistant powered by OpenClaw gateway.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.Gray
+                    )
                 }
             }
 

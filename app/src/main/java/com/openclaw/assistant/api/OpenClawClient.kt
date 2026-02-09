@@ -99,7 +99,7 @@ class OpenClawClient {
             addProperty("platform", "android")
             addProperty("deviceFamily", Build.MANUFACTURER)
             addProperty("modelIdentifier", Build.MODEL)
-            addProperty("mode", "operator")
+            addProperty("mode", "ui")
         }
         
         // Build params
